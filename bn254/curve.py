@@ -1,36 +1,21 @@
-#!/usr/bin/env python3
+#
+# Modified by Wyatt Howe and Nth Party, Ltd. for
+# https://github.com/nthparty/bn254 from the archive
+# of the Apache Milagro Cryptographic Library found at
+# https://github.com/apache/incubator-milagro-crypto.
+#
 
-#
-# Copyright (c) 2012-2020 MIRACL UK Ltd.
-#
-# This file is part of MIRACL Core
-# (see https://github.com/miracl/core).
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# lib curve constants
+# BN254 curve constants
 
 from bn254.constants import *
 
 SHA = 'sha256'   # hash type to use with this curve
 EFS = 32   # Elliptic curve Field Size in bytes
 CurveType = WEIERSTRASS
-CurveCof = 1
 
 SexticTwist = D_TYPE
 SignOfX = NEGATIVEX
 PairingFriendly = BN
-QNRI = 0
 
 x = 0x4080000000000001
 if SignOfX == NEGATIVEX:

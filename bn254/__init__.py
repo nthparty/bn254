@@ -10,6 +10,6 @@ from bn254.ecp import generator
 from bn254.ecp2 import ECp2
 from bn254.fp import Fp
 from bn254.fp12 import Fp12
-from bn254.fp12 import one
 from bn254.fp2 import Fp2
 from bn254.fp4 import Fp4
+one = Fp12.one

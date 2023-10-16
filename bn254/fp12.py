@@ -1,52 +1,8 @@
-#!/usr/bin/env python3
-
 #
-# Copyright (c) 2012-2020 MIRACL UK Ltd.
-#
-# This file is part of MIRACL Core
-# (see https://github.com/miracl/core).
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU Affero General Public License as
-#    published by the Free Software Foundation, either version 3 of the
-#    License, or (at your option) any later version.
-
-
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU Affero General Public License for more details.
-
-#     https://www.gnu.org/licenses/agpl-3.0.en.html
-
-#    You should have received a copy of the GNU Affero General Public License
-#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-
-#   You can be released from the requirements of the license by purchasing     
-#   a commercial license. Buying such a license is mandatory as soon as you
-#   develop commercial activities involving the MIRACL Core Crypto SDK
-#   without disclosing the source code of your own applications, or shipping
-#   the MIRACL Core Crypto SDK with a closed source product.     
-
+# Modified by Wyatt Howe and Nth Party, Ltd. for
+# https://github.com/nthparty/bn254 from the archive
+# of the Apache Milagro Cryptographic Library found at
+# https://github.com/apache/incubator-milagro-crypto.
 #
 # Fp^12 CLass -  towered over Fp^4
 # M.Scott August 2018
@@ -54,11 +10,9 @@
 
 import copy
 from bn254.constants import *
-from bn254 import big
 from bn254 import curve
-from bn254.fp4 import Fp4
-from bn254.fp2 import Fp2
-from bn254.fp import Fp
+from bn254.fp4 import *
+
 
 class Fp12:
 
@@ -79,6 +33,13 @@ class Fp12:
 
     def copy(self):
         return copy.deepcopy(self)
+
+    def one():
+        return Fp12(Fp4(Fp2(Fp(1))))
+
+    def zero():
+        return Fp12(Fp4(Fp2(Fp(0))))
+
 
     def get(self):
         return(self.a, self.b, self.c)
@@ -418,9 +379,3 @@ class Fp12:
             E[11 * FS + i] = W[i]
 
         return E
-
-def one():
-    return Fp12(Fp4(Fp2(Fp(1))))
-
-def zero():
-    return Fp12(Fp4(Fp2(Fp(0))))

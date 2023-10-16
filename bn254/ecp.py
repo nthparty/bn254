@@ -1,52 +1,8 @@
-#!/usr/bin/env python3
-
 #
-# Copyright (c) 2012-2020 MIRACL UK Ltd.
-#
-# This file is part of MIRACL Core
-# (see https://github.com/miracl/core).
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU Affero General Public License as
-#    published by the Free Software Foundation, either version 3 of the
-#    License, or (at your option) any later version.
-
-
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU Affero General Public License for more details.
-
-#     https://www.gnu.org/licenses/agpl-3.0.en.html
-
-#    You should have received a copy of the GNU Affero General Public License
-#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-
-#   You can be released from the requirements of the license by purchasing
-#   a commercial license. Buying such a license is mandatory as soon as you
-#   develop commercial activities involving the MIRACL Core Crypto SDK
-#   without disclosing the source code of your own applications, or shipping
-#   the MIRACL Core Crypto SDK with a closed source product.
-
+# Modified by Wyatt Howe and Nth Party, Ltd. for
+# https://github.com/nthparty/bn254 from the archive
+# of the Apache Milagro Cryptographic Library found at
+# https://github.com/apache/incubator-milagro-crypto.
 #
 # Elliptic Curve Points
 # Projective Weierstrass coordinates
@@ -57,7 +13,7 @@ from bn254.constants import *
 
 from bn254 import big
 from bn254 import curve
-from bn254.fp import Fp
+from bn254.fp import *
 
 
 class ECp:
@@ -112,7 +68,7 @@ class ECp:
     def set(self, x, s=0):			# set point from x and LSB of y
         mx = Fp(x)
         rhs = RHS(mx)
-        if rhs.qr() != 1:
+        if rhs.jacobi() != 1:
             return False
         self.x = mx
         self.z = Fp(1)
@@ -224,8 +180,8 @@ class ECp:
                 t2 = self.z.copy()
                 t3 = self.x.copy()
                 z3 = self.z.copy()
-                #y3 = Fp(0)
-                #x3 = Fp(0)
+                y3 = Fp(0)
+                x3 = Fp(0)
                 b = ECp.B
 
                 t0 *= t0
@@ -279,7 +235,7 @@ class ECp:
             C = self.x.copy()
             D = self.y.copy()
             H = self.z.copy()
-            #J = Fp(0)
+            J = Fp(0)
 
             self.x *= self.y
             self.x += self.x
@@ -306,15 +262,15 @@ class ECp:
         if curve.CurveType == MONTGOMERY:
             A = self.x.copy()
             B = self.x.copy()
-            #AA = Fp(0)
-            #BB = Fp(0)
-            #C = Fp(0)
+            AA = Fp(0)
+            BB = Fp(0)
+            C = Fp(0)
 
             A += self.z
             AA = A * A
             B -= self.z
             BB = B * B
-            #C = AA
+            C = AA
             C = AA - BB
             self.x = AA * BB
 
@@ -383,7 +339,7 @@ class ECp:
                 t2 = self.z.copy()
                 t3 = self.x.copy()
                 t4 = other.x.copy()
-                #z3 = Fp(0)
+                z3 = Fp(0)
                 y3 = other.x.copy()
                 x3 = other.y.copy()
                 b = ECp.B
@@ -449,12 +405,12 @@ class ECp:
 
         if curve.CurveType == EDWARDS:
             A = self.z.copy()
-            #B = Fp(0)
+            B = Fp(0)
             C = self.x.copy()
             D = self.y.copy()
-            #E = Fp(0)
-            #F = Fp(0)
-            #G = Fp(0)
+            E = Fp(0)
+            F = Fp(0)
+            G = Fp(0)
             b = ECp.B
 
             # print(self.z.int())
@@ -500,8 +456,8 @@ class ECp:
         B = self.x.copy()
         C = Q.x.copy()
         D = Q.x.copy()
-        #DA = Fp(0)
-        #CB = Fp(0)
+        DA = Fp(0)
+        CB = Fp(0)
 
         A += self.z
         B -= self.z
@@ -527,12 +483,13 @@ class ECp:
         R = ECp()
         if curve.CurveType == MONTGOMERY:
             e = other
-            #D = ECp()
+            D = ECp()
             R0 = self.copy()
             R1 = self.copy()
             R1.dbl()
 
             D = self.copy()
+            D.affine()
             nb = e.bit_length()
             # nb=curve.r.bit_length()
             for i in range(nb - 2, -1, -1):
@@ -561,6 +518,38 @@ class ECp:
                     R.add(self)
                 if big.bit(b3, i) == 0 and big.bit(b, i) == 1:
                     R.add(mself)
+        R.affine()
+        return R
+
+    def mul(P, a, Q, b):  # double multiplication a*P+b*Q
+        # P.affine()
+        # Q.affine()
+        if a < 0:
+            a = -a
+            P = -P
+        if b < 0:
+            b = -b
+            Q = -Q
+        R = ECp()
+        ia = a.bit_length()
+        ib = b.bit_length()
+        k = ia
+        if (ib > ia):
+            k = ib
+        k = curve.r.bit_length()
+        W = P.copy()
+        W.add(Q)
+        # W.affine()
+        for i in range(k - 1, -1, -1):
+            R.dbl()
+            if (big.bit(a, i) == 1):
+                if (big.bit(b, i) == 1):
+                    R.add(W)
+                else:
+                    R.add(P)
+            else:
+                if (big.bit(b, i) == 1):
+                    R.add(Q)
         return R
 
     def __str__(self):			# pretty print
@@ -574,15 +563,12 @@ class ECp:
 
 # convert from and to an array of bytes
     def fromBytes(self, W):
-        if curve.CurveType == MONTGOMERY:
-            x = big.from_bytes(W[0:curve.EFS])
-            return self.set(x)
-
         t = W[0]  # ord(W[0])
         sp1 = curve.EFS + 1	  # splits
         sp2 = sp1 + curve.EFS
-
         x = big.from_bytes(W[1:sp1])
+        if curve.CurveType == MONTGOMERY:
+            return self.set(x)
         if t == 4:
             y = big.from_bytes(W[sp1:sp2])
             return self.setxy(x, y)
@@ -598,12 +584,12 @@ class ECp:
     def toBytes(self, compress):
         FS = curve.EFS
         if curve.CurveType == MONTGOMERY:
-            PK = bytearray(FS)
-            #PK[0] = 6
+            PK = bytearray(FS + 1)
+            PK[0] = 6
             x = self.get()
             W = big.to_bytes(x)
             for i in range(0, FS):
-                PK[i] = W[i]
+                PK[1 + i] = W[i]
             return PK
         if compress:
             PK = bytearray(FS + 1)
@@ -628,34 +614,8 @@ class ECp:
 
         return PK
 
-def mul(P, a, Q, b):  # double multiplication a*P+b*Q
-    # P.affine()
-    # Q.affine()
-    if a < 0:
-        a = -a
-        P = -P
-    if b < 0:
-        b = -b
-        Q = -Q
-    R = ECp()
-    k = curve.r.bit_length()
-    W = P.copy()
-    W.add(Q)
-    # W.affine()
-    for i in range(k - 1, -1, -1):
-        R.dbl()
-        if (big.bit(a, i) == 1):
-            if (big.bit(b, i) == 1):
-                R.add(W)
-            else:
-                R.add(P)
-        else:
-            if (big.bit(b, i) == 1):
-                R.add(Q)
-    return R
-
-
 # calculate Right Hand Side of elliptic curve equation y^2=RHS(x)
+
 
 def RHS(x):
     if curve.CurveType == WEIERSTRASS:

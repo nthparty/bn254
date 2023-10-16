@@ -1,52 +1,8 @@
-#!/usr/bin/env python3
-
 #
-# Copyright (c) 2012-2020 MIRACL UK Ltd.
-#
-# This file is part of MIRACL Core
-# (see https://github.com/miracl/core).
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU Affero General Public License as
-#    published by the Free Software Foundation, either version 3 of the
-#    License, or (at your option) any later version.
-
-
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU Affero General Public License for more details.
-
-#     https://www.gnu.org/licenses/agpl-3.0.en.html
-
-#    You should have received a copy of the GNU Affero General Public License
-#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-
-#   You can be released from the requirements of the license by purchasing     
-#   a commercial license. Buying such a license is mandatory as soon as you
-#   develop commercial activities involving the MIRACL Core Crypto SDK
-#   without disclosing the source code of your own applications, or shipping
-#   the MIRACL Core Crypto SDK with a closed source product.     
-
+# Modified by Wyatt Howe and Nth Party, Ltd. for
+# https://github.com/nthparty/bn254 from the archive
+# of the Apache Milagro Cryptographic Library found at
+# https://github.com/apache/incubator-milagro-crypto.
 #
 # Elliptic Curve Points over Fp^2
 # Projective Weierstrass coordinates
@@ -54,12 +10,11 @@
 #
 
 import copy
-from bn254.constants import *
+
 from bn254 import big
 from bn254 import curve
-from bn254.fp2 import Fp2
-from bn254.fp import Fp
-from bn254.ecp import ECp
+from bn254.fp2 import *
+from bn254.ecp import *
 
 
 class ECp2:
@@ -96,19 +51,6 @@ class ECp2:
             return False
         self.x = mx
         self.y = my
-        self.z = Fp2(Fp(1))
-        return True
-
-    def setx(self,x,s):
-        mx = x.copy()
-        rhs = RHS(mx)
-        if rhs.qr() != 1:
-            return False
-        rhs.sqrt()
-        if rhs.sign() != s:
-            rhs = - rhs
-        self.x = mx
-        self.y = rhs
         self.z = Fp2(Fp(1))
         return True
 
@@ -286,45 +228,32 @@ class ECp2:
 # convert from and to an array of bytes
     def fromBytes(self, W):
         FS = curve.EFS
-        typ = W[0]
-        xa = big.from_bytes(W[1:FS+1])
-        xb = big.from_bytes(W[FS+1:2 * FS+1])
+        xa = big.from_bytes(W[0:FS])
+        xb = big.from_bytes(W[FS:2 * FS])
+        ya = big.from_bytes(W[2 * FS:3 * FS])
+        yb = big.from_bytes(W[3 * FS:4 * FS])
         x = Fp2(Fp(xa), Fp(xb))
-        if typ == 0x04:
-            ya = big.from_bytes(W[2 * FS+1:3 * FS+1])
-            yb = big.from_bytes(W[3 * FS+1:4 * FS+1])
-            y = Fp2(Fp(ya), Fp(yb))
-            return self.set(x, y)
-        else :
-            return self.setx(x,typ&1)
+        y = Fp2(Fp(ya), Fp(yb))
+        return self.set(x, y)
 
-    def toBytes(self,compress):
+    def toBytes(self):
         FS = curve.EFS
-        if compress:
-            PK = bytearray(2 * FS + 1)
-        else :
-            PK = bytearray(4 * FS + 1)
+        PK = bytearray(4 * FS)
         x, y = self.get()
         xa, xb = x.get()
         ya, yb = y.get()
         W = big.to_bytes(xa)
         for i in range(0, FS):
-            PK[i+1] = W[i]
+            PK[i] = W[i]
         W = big.to_bytes(xb)
         for i in range(0, FS):
-            PK[FS + i + 1] = W[i]
-        if not compress:
-            PK[0]=0x04
-            W = big.to_bytes(ya)
-            for i in range(0, FS):
-                PK[2 * FS + i + 1] = W[i]
-            W = big.to_bytes(yb)
-            for i in range(0, FS):
-                PK[3 * FS + i + 1] = W[i]
-        else :
-            PK[0]=0x02
-            if y.sign() == 1:
-                PK[0]=0x03
+            PK[FS + i] = W[i]
+        W = big.to_bytes(ya)
+        for i in range(0, FS):
+            PK[2 * FS + i] = W[i]
+        W = big.to_bytes(yb)
+        for i in range(0, FS):
+            PK[3 * FS + i] = W[i]
         return PK
 
 # calculate Right Hand Side of elliptic curve equation y^2=RHS(x)

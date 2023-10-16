@@ -1,70 +1,28 @@
-#!/usr/bin/env python3
-
 #
-# Copyright (c) 2012-2020 MIRACL UK Ltd.
-#
-# This file is part of MIRACL Core
-# (see https://github.com/miracl/core).
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU Affero General Public License as
-#    published by the Free Software Foundation, either version 3 of the
-#    License, or (at your option) any later version.
-
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU Affero General Public License for more details.
-
-#     https://www.gnu.org/licenses/agpl-3.0.en.html
-
-#    You should have received a copy of the GNU Affero General Public License
-#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-
-#   You can be released from the requirements of the license by purchasing
-#   a commercial license. Buying such a license is mandatory as soon as you
-#   develop commercial activities involving the MIRACL Core Crypto SDK
-#   without disclosing the source code of your own applications, or shipping
-#   the MIRACL Core Crypto SDK with a closed source product.
-
+# Modified by Wyatt Howe and Nth Party, Ltd. for
+# https://github.com/nthparty/bn254 from the archive
+# of the Apache Milagro Cryptographic Library found at
+# https://github.com/apache/incubator-milagro-crypto.
 #
 # Python 3.7 Code to implement basic MPIN protocol API
 # M.Scott August 2018
 #
 
 import hashlib
-#from bn254 import ecp
+from bn254 import ecp
 from bn254 import ecp2
 from bn254 import curve
 from bn254 import big
-from bn254.ecp import ECp
-from bn254.ecp2 import ECp2
+from bn254.ecp import *
+from bn254.ecp2 import *
 from bn254 import pair
-from bn254.fp12 import Fp12
-from bn254.fp12 import one
+from bn254.fp12 import *
 
 # hash ID to point on curve
 
+
 def H(mpin_id):
+    r = curve.r
     p = curve.p
     h = hashlib.new(curve.SHA)
     h.update(bytes(mpin_id, 'utf-8'))
@@ -73,11 +31,21 @@ def H(mpin_id):
     P = ECp()
     while not P.set(x):
         x = x + 1
-    P = curve.CurveCof * P
+# work out co-factor
+    nb = p.bit_length()
+    cf = 1
+    cf = cf << (nb + 4) // 2
+    cf += p
+    cf //= r
+
+    if cf != 1:
+        P = cf * P
+
     return P
 
 
 def random_generate():
+    FS = curve.EFS
     s = big.rand(curve.r)
     Z = big.to_bytes(s)
     return Z
@@ -87,7 +55,7 @@ def get_server_secret(Z):
     Q = ecp2.generator()
     s = big.from_bytes(Z)
     Q = s * Q
-    return Q.toBytes(False)
+    return Q.toBytes()
 
 
 def get_client_secret(Z, ID):
@@ -95,7 +63,6 @@ def get_client_secret(Z, ID):
     s = big.from_bytes(Z)
     P = s * P
     return P.toBytes(False)
-
 
 # subtract pin.ID from Secret key SK to create Token
 
@@ -110,7 +77,6 @@ def extract_pin(ID, PIN, SK):
     # S.affine()
     return S.toBytes(False)
 
-
 # U=xH(ID)
 
 
@@ -123,7 +89,6 @@ def client_1(ID, X):
         X = big.to_bytes(w)
     P = w * P
     return (X, P.toBytes(False))
-
 
 # reconstitute Client secret S from Token and PIN
 # V=(x+y)S
@@ -145,7 +110,6 @@ def client_2(X, Y, ID, PIN, TK):
 
     S = x * S
     return S.toBytes(False)
-
 
 # authenticate
 
@@ -179,24 +143,27 @@ def server(ID, Y, SS, U, V):
     if r.isone():
         return (True, bytearray(0), bytearray(0))
 
-
 # failed - diagnose it
     E = r.toBytes()
     r = pair.e(Q, TU)
     F = r.toBytes()
     return (False, E, F)
 
+
 MAXPIN = 10000
 TS = 10
 TRAP = 200
 
+
 def kangaroo(E, F):
+    FS = curve.EFS
+
     e = Fp12()
     e.fromBytes(E)
     f = Fp12()
     f.fromBytes(F)
 
-    # Pollards Kangaroos
+# Pollards Kangaroos
     t = f.copy()
 
     distance = []
@@ -208,14 +175,13 @@ def kangaroo(E, F):
         s *= 2
         t.usqr()
 
-    t = one()
-    # set trap
+    t = Fp12.one()
+# set trap
     dn = 0
     for j in range(0, TRAP):
         i = t.a.a.a.int() % TS
         t *= table[i]
         dn += distance[i]
-
 
 # release wild kangaroo
     f = t.copy()
@@ -262,4 +228,4 @@ def add_G2(A, B):
     if not B1.fromBytes(B):
         return None
     A1.add(B1)
-    return A1.toBytes(False)
+    return A1.toBytes()

@@ -1,122 +1,71 @@
-#!/usr/bin/env python3
-
 #
-# Copyright (c) 2012-2020 MIRACL UK Ltd.
-#
-# This file is part of MIRACL Core
-# (see https://github.com/miracl/core).
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU Affero General Public License as
-#    published by the Free Software Foundation, either version 3 of the
-#    License, or (at your option) any later version.
-
-
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU Affero General Public License for more details.
-
-#     https://www.gnu.org/licenses/agpl-3.0.en.html
-
-#    You should have received a copy of the GNU Affero General Public License
-#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-
-#   You can be released from the requirements of the license by purchasing     
-#   a commercial license. Buying such a license is mandatory as soon as you
-#   develop commercial activities involving the MIRACL Core Crypto SDK
-#   without disclosing the source code of your own applications, or shipping
-#   the MIRACL Core Crypto SDK with a closed source product.     
-
+# Modified by Wyatt Howe and Nth Party, Ltd. for
+# https://github.com/nthparty/bn254 from the archive
+# of the Apache Milagro Cryptographic Library found at
+# https://github.com/apache/incubator-milagro-crypto.
 #
 # Optimal Ate Pairing
 # M.Scott August 2018
 #
 
 from bn254.constants import *
+
 from bn254 import curve
 from bn254 import big
-from bn254.fp2 import Fp2
-from bn254.fp4 import Fp4
-from bn254.fp12 import Fp12
-from bn254.fp12 import one
+from bn254.fp2 import *
+from bn254.fp4 import *
+from bn254.fp12 import *
+
+from bn254 import ecp
+from bn254 import ecp2
 
 # line function
 
-def dbl(A) :
-    CC, YY, BB = A.getxyz()
-    AA = YY * BB
-    CC.sqr()
-    YY.sqr()
-    BB.sqr()
-
-    AA += AA
-    AA = -AA
-    AA = AA.mulQNR()
-    BB = BB.muli(3 * curve.B)
-    CC = CC.muli(3)
-    if curve.SexticTwist == D_TYPE:
-        YY = YY.mulQNR()
-        CC = CC.mulQNR()
-    if curve.SexticTwist == M_TYPE:    
-        BB = BB.mulQNR()
-    BB=BB-YY
-    A.dbl()
-    return (AA,BB,CC)
-
-def add(A,B) :
-    X1, Y1, Z1 = A.getxyz()
-    X2, Y2 = B.getxy()
-    T1 = (X1 - Z1 * X2)
-    T2 = (Y1 - Z1 * Y2)
-
-    AA = T1
-    BB = T2*X2-T1*Y2
-    CC = -T2
-
-    if curve.SexticTwist == M_TYPE:
-        AA=AA.mulQNR()
-
-    A.add(B)
-    return (AA,BB,CC)
-
 def g(A, B, Qx, Qy):
     if A == B:
-        AA,BB,CC=dbl(A)
+        XX, YY, ZZ = A.getxyz()
+        YZ = YY * ZZ
+        XX.sqr()
+        YY.sqr()
+        ZZ.sqr()
+
+        ZZ = ZZ.muli(3 * curve.B)
+        if curve.SexticTwist == D_TYPE:
+            ZZ = ZZ.divQNR2()
+        else:
+            ZZ = ZZ.mulQNR()
+            ZZ += ZZ
+            YZ = YZ.mulQNR()
+
+        a = Fp4(-YZ.muls(Qy).muli(4), ZZ - (YY + YY))
+        if curve.SexticTwist == D_TYPE:
+            b = Fp4(XX.muli(6).muls(Qx))
+            c = Fp4()
+        else:
+            b = Fp4()
+            c = Fp4(XX.muli(6).muls(Qx))
+            c.times_i()
+        A.dbl()
+        return Fp12(a, b, c)
     else:
-        AA,BB,CC=add(A,B)
+        X1, Y1, Z1 = A.getxyz()
+        X2, Y2 = B.getxy()
+        T1 = (X1 - Z1 * X2)
+        T2 = (Y1 - Z1 * Y2)
 
-    CC=CC.muls(Qx)
-    AA=AA.muls(Qy)
+        if curve.SexticTwist == D_TYPE:
+            a = Fp4(T1.muls(Qy), T2 * X2 - T1 * Y2)
+            b = Fp4(-T2.muls(Qx))
+            c = Fp4()
+        else:
+            a = Fp4(T1.muls(Qy).mulQNR(), T2 * X2 - T1 * Y2)
+            b = Fp4()
+            c = Fp4(-T2.muls(Qx))
+            c.times_i()
+        A.add(B)
+        return Fp12(a, b, c)
 
-    a=Fp4(AA,BB)
-    if curve.SexticTwist == D_TYPE:
-        b=Fp4(CC)
-        c=Fp4()
-    else :
-        b=Fp4()
-        c=Fp4(CC).times_i()
-
-    return Fp12(a, b, c)
+# full pairing - miller loop followed by final exponentiation
 
 def lbits() :
     x = curve.x
@@ -135,12 +84,12 @@ def initmp() :
     nb,n3,n=lbits()
     r=[]
     for i in range (nb-1,-1,-1) :
-        r.append(one())
+        r.append(Fp12.one())
     return r
 
 def miller(r) :
     nb,n3,n=lbits()
-    res=one()
+    res=Fp12.one()
     for i in range (nb-1,0,-1) :
         res.sqr()
         res *= r[i]
@@ -149,86 +98,7 @@ def miller(r) :
     res *= r[0]
     return res
 	
-def pack(AA,BB,CC) :
-    i=CC.inverse()
-    return Fp4(AA*i,BB*i)
-
-def unpack(T,Qx,Qy) :
-    aa,bb=T.get()
-    aa=aa.muls(Qy)
-    a=Fp4(aa,bb)
-  
-    t=Fp2(Qx)
-    if curve.SexticTwist == D_TYPE:
-        b=Fp4(t)
-        c=Fp4()
-    else :
-        b=Fp4()
-        c=Fp4(t).times_i()
-    return Fp12(a,b,c)
-
-def precomp(GV) :
-    nb,n3,n=lbits()
-    P=GV.copy()
-    A=P.copy()
-    MP=-P
-    T=[]
-    for i in range(nb - 2, 0, -1):
-        AA,BB,CC = dbl(A)
-        T.append(pack(AA,BB,CC))
-        if big.bit(n3, i) == 1 and big.bit(n, i) == 0:
-            AA,BB,CC= add(A,P)
-            T.append(pack(AA,BB,CC))
-        if big.bit(n3, i) == 0 and big.bit(n, i) == 1:
-            AA,BB,CC=add(A,MP)
-            T.append(pack(AA,BB,CC))
-    
-    if curve.PairingFriendly == BN:
-        KA = P.copy()
-        KA.frobenius()
-        if curve.SignOfX == NEGATIVEX:
-            A = -A
-        AA,BB,CC=add(A,KA)
-        T.append(pack(AA,BB,CC))
-        KA.frobenius()
-        KA = -KA
-        AA,BB,CC=add(A,KA)
-        T.append(pack(AA,BB,CC))
-    return T
-
-# Accumulate another set of line functions for n-pairing, assuming precomputation on G2 
-def another_pc(r,T,QV) :
-    if QV.isinf() :
-        return
-    nb,n3,n=lbits()
-    Q=QV.copy()
-    Q.affine()
-    Qx, Qy = Q.getxy()	
-    j=0
-    for i in range(nb - 2, 0, -1):
-        lv=unpack(T[j],Qx,Qy)
-        j+=1
-        if big.bit(n3, i) == 1 and big.bit(n, i) == 0:
-            lv2=unpack(T[j],Qx,Qy)
-            j+=1
-            lv.smul(lv2)
-        if big.bit(n3, i) == 0 and big.bit(n, i) == 1:        
-            lv2=unpack(T[j],Qx,Qy)
-            j+=1
-            lv.smul(lv2)
-        r[i] *= lv
-
-    if curve.PairingFriendly == BN:
-        lv=unpack(T[j],Qx,Qy)
-        j+=1
-        lv2=unpack(T[j],Qx,Qy)
-        lv.smul(lv2)
-        r[0] *= lv
-
-# Accumulate another set of line functions for n-pairing 
 def another(r,P1,Q1) :
-    if Q1.isinf() :
-        return
     nb,n3,n=lbits()
     P = P1.copy()
     Q = Q1.copy()
@@ -260,16 +130,12 @@ def another(r,P1,Q1) :
         lv.smul(lv2)
         r[0] *= lv
 
-# full pairing - miller loop followed by final exponentiation
-
 def e(P, Q):
     r = ate(P, Q)
     return fexp(r)
 
 
 def ate(P1, Q1):
-    if Q1.isinf() :
-        return one();
     nb,n3,n=lbits()
     
     P = P1.copy()
@@ -279,7 +145,7 @@ def ate(P1, Q1):
     Q.affine()
     A = P.copy()
     Qx, Qy = Q.getxy()
-    r = one()
+    r = Fp12.one()
 # miller loop
     for i in range(nb - 2, 0, -1):
         r.sqr()
@@ -314,10 +180,6 @@ def ate(P1, Q1):
 
 def double_ate(P1, Q1, U1, V1):
 
-    if Q1.isinf() :
-        return ate(U1,V1)
-    if V1.isinf() :
-        return ate(P1,Q1)
     nb,n3,n=lbits()
 
     P = P1.copy()
@@ -333,7 +195,7 @@ def double_ate(P1, Q1, U1, V1):
     Qx, Qy = Q.getxy()
     B = U.copy()
     Wx, Wy = V.getxy()
-    r = one()
+    r = Fp12.one()
 # miller loop
     for i in range(nb - 2, 0, -1):
         r.sqr()
@@ -341,6 +203,8 @@ def double_ate(P1, Q1, U1, V1):
         lv2 = g(B, B, Wx, Wy)
         lv.smul(lv2)
         r *= lv
+        #r *= g(A, A, Qx, Qy)
+        #r *= g(B, B, Wx, Wy)
         if big.bit(n3, i) == 1 and big.bit(n, i) == 0:
             lv = g(A, P, Qx, Qy)
             lv2 = g(B, U, Wx, Wy)
@@ -391,7 +255,9 @@ def fexp(r):
     r.powq()
     r.powq()
     r *= t0
-
+    if r.isone() :
+        r.zero()
+        return
 # final exp - hard part
     x = curve.x
 

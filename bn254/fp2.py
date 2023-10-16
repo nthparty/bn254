@@ -1,62 +1,18 @@
-#!/usr/bin/env python3
-
 #
-# Copyright (c) 2012-2020 MIRACL UK Ltd.
-#
-# This file is part of MIRACL Core
-# (see https://github.com/miracl/core).
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU Affero General Public License as
-#    published by the Free Software Foundation, either version 3 of the
-#    License, or (at your option) any later version.
-
-
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU Affero General Public License for more details.
-
-#     https://www.gnu.org/licenses/agpl-3.0.en.html
-
-#    You should have received a copy of the GNU Affero General Public License
-#    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-
-#   You can be released from the requirements of the license by purchasing     
-#   a commercial license. Buying such a license is mandatory as soon as you
-#   develop commercial activities involving the MIRACL Core Crypto SDK
-#   without disclosing the source code of your own applications, or shipping
-#   the MIRACL Core Crypto SDK with a closed source product.     
-
+# Modified by Wyatt Howe and Nth Party, Ltd. for
+# https://github.com/nthparty/bn254 from the archive
+# of the Apache Milagro Cryptographic Library found at
+# https://github.com/apache/incubator-milagro-crypto.
 #
 # Fp^2 CLass
 # M.Scott August 2018
 #
 
 import copy
-from bn254.fp import Fp
-from bn254 import curve
+from bn254.fp import *
 
 # a+ib, where a,b are Fp, i is "imaginary" sqrt(-1) mod p
+
 
 class Fp2:
 
@@ -116,7 +72,10 @@ class Fp2:
         return self
 
     def times_i(self):
-        return Fp2(-self.b,self.a)
+        x = self.a.copy()
+        self.a = self.b
+        self.b = x
+        return self
 
     def __imul__(self, other):
         t1 = self.a * other.a
@@ -146,13 +105,6 @@ class Fp2:
     def __neg__(self):
         return Fp2(-self.a, -self.b)
 
-    def sign(self):
-        p1=self.a.int()&1
-        p2=self.b.int()&1
-        u=1 if self.a.iszero() else 0
-        p1^=(p1^p2)&u
-        return p1
-
     def real(self):
         return self.a
 
@@ -180,8 +132,8 @@ class Fp2:
     def __str__(self):			# pretty print
         return "[%x,%x]" % (self.a.int(), self.b.int())
 
-    def mulQNR(self):				# assume QNR=2^i+sqrt(-1)
-        return (self.times_i()+self.muli(1<<curve.QNRI))
+    def mulQNR(self):				# assume p=3 mod 8, QNR=1+i
+        return Fp2(self.a - self.b, self.a + self.b)
 
     def inverse(self):
         w = self.conj()
@@ -196,48 +148,10 @@ class Fp2:
         newb = self.b.div2()
         return Fp2(newa, newb)
 
-    def divQNR(self):				# assume QNR=2^i+sqrt(-1)
-        z = Fp2(Fp(1<<curve.QNRI),Fp(1))
-        return self*z.inverse()
+    def divQNR(self):				# assume p=3 mod 8, QNR=1+i
+        r = Fp2(self.a + self.b, self.b - self.a)
+        return r.div2()
 
-    def pow(self, other):
-        z=other
-        r=Fp2(Fp(1))
-        w=self.copy()
-        while True :
-            bt=z&1
-            z >>= 1
-            if bt == 1: 
-                r *= w
-            if z == 0 :
-                break
-            w.sqr()
-        return r.copy()
-    
-    def qr(self):
-        w=self.conj()
-        w *= self
-        return Fp.qr(w.a)
-
-    def sqrt(self):
-        w1=self.b.copy()
-        w2=self.a.copy()
-        w1 *= w1
-        w2 *= w2
-        w1 += w2
-        w1=w1.sqrt()
-        w2=self.a.copy()
-        w2 += w1
-        w2 = w2.div2()
-        if w2.qr() != 1 :
-            w2=self.a.copy()
-            w2 -= w1
-            w2 = w2.div2()
-        w2=w2.sqrt()
-        self.a = w2.copy()
-        w2 += w2
-        w2 = w2.inverse()
-        self.b *= w2 
-
-
-
+    def divQNR2(self):				# assume p=3 mod 8, QNR=1+i
+        r = Fp2(self.a + self.b, self.b - self.a)
+        return r
